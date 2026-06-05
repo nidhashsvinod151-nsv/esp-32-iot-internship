@@ -1,1 +1,14 @@
 
+# WiFi credentials - never commit these!
+secrets.h
+*.h.bak
+
+# Arduino build files
+build/
+*.elf
+*.bin
+*.hex
+
+# OS files
+.DS_Store
+Thumbs.db
