@@ -19,7 +19,7 @@ void setup() {
   connectWiFi();
   setupOTA();
 
-  Serial.println("Ready. Waiting for OTA...");
+  Serial.println("running..");
 }
 
 void connectWiFi() {
