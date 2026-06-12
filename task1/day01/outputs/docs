@@ -1,0 +1,7 @@
+
+DHT22 Pin    →    Your Board
+──────────────────────────────
+Pin 1 (VCC)  →    3.3V  ⚠️ NOT 5V
+Pin 2 (DATA) →    GPIO4
+Pin 3 (NC)   →    Leave empty
+Pin 4 (GND)  →    GND
