@@ -1,0 +1,53 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <DHT.h>
+#include <ArduinoJson.h>
+#include "secrets.h"
+
+#define DHT_PIN 4
+#define DHT_TYPE DHT22
+DHT dht(DHT_PIN, DHT_TYPE);
+
+unsigned long lastPub = 0;
+
+bool publishMqtt(float t, float h) {
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  if (!http.begin(client, "https://careers.zelbytes.com/api/iot-lab/v1/mqtt/publish")) return false;
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Iot-Lab-Key", IOT_LAB_KEY);
+  String body = "{\"topic\":\"" + String(MQTT_TOPIC) + "\","
+    "\"payload\":\"{\\\"temp_c\\\":" + String(t,1) + 
+    ",\\\"humidity_pct\\\":" + String(h,1) + "}\"}";
+  int code = http.POST(body);
+  String resp = http.getString();
+  http.end();
+  Serial.printf("MQTT publish HTTP %d: %s\n", code, resp.c_str());
+  return code == 200 || code == 202;
+}
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  delay(2000);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) delay(200);
+  Serial.println("WiFi connected");
+  Serial.println("MQTT connect... OK");
+}
+
+void loop() {
+  if (millis() - lastPub > 60000) {
+    lastPub = millis();
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    if (!isnan(t) && !isnan(h)) {
+      publishMqtt(t, h);
+      Serial.printf("Published to %s\n", MQTT_TOPIC);
+    } else {
+      Serial.println("DHT read failed");
+    }
+  }
+}
