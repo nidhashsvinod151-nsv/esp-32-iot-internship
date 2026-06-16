@@ -1,0 +1,95 @@
+Zelbytes IoT Platform — Architecture Preview
+
+## Overview
+Zelbytes is building a dedicated IoT learning platform at careers.zelbytes.com
+with fleet HTTP ingest and an MQTT broker for intern capstones. Integration
+is not live for this cohort yet. This document studies the planned
+architecture, drafts client config stubs, and maps the Day 8 SensorBundle
+schema to anticipated future API fields, so switching from the lab Mosquitto
+broker to production is a config change, not a rewrite.
+
+Planned endpoints (subject to change):
+- `POST https://careers.zelbytes.com/api/v1/iot/telemetry`
+- `mqtts://careers.zelbytes.com:8883`
+- Device tokens issued from the careers portal
+
+## Architecture Diagram
+ESP32 Nodes (Zelbytes interns' devices)
+
+|
+
+|-- MQTT publish (live telemetry, commands) --> mqtts://careers.zelbytes.com:8883
+
+|-- HTTPS POST (bulk logs, config) -----------> https://careers.zelbytes.com/api/v1/iot/telemetry
+
+|
+
+v
+
+Zelbytes Backend Storage / Database
+
+|
+
+v
+
+Careers Portal Dashboard (mentor review, fleet status)
+
+## Placeholder Config Stub
+
+File: `config_zelbytes_platform.h`
+
+```cpp
+#ifdef ZELBYTES_PLATFORM
+  // Production — Zelbytes platform (not yet live for this cohort)
+  #define ZELBYTES_HTTP_URL  "https://careers.zelbytes.com/api/v1/iot/telemetry"
+  #define ZELBYTES_MQTT_HOST "careers.zelbytes.com"
+  #define ZELBYTES_MQTT_PORT 8883
+  #define DEVICE_TOKEN       "REPLACE_WITH_ISSUED_TOKEN"
+#else
+  // Current lab setup — local Mosquitto broker / test server
+  #define ZELBYTES_HTTP_URL  "http://192.168.1.50/api/telemetry"
+  #define ZELBYTES_MQTT_HOST "192.168.1.50"
+  #define ZELBYTES_MQTT_PORT 1883
+  #define DEVICE_TOKEN       "lab-test-token"
+#endif
+```
+
+This compiles correctly with `ZELBYTES_PLATFORM` left undefined, falling back
+to the lab configuration. No firmware rewrite will be needed when the
+platform goes live — only this block needs updating.
+
+## SensorBundle v1 → Future API Field Mapping
+
+| SensorBundle field | Anticipated future API field | Notes                                       |
+|----------------------|----------------------------------|--------------------------------------------------|
+| node_id                | device_id                          | Likely renamed for platform convention             |
+| ts                     | timestamp                           | Same Unix epoch value, field name may change         |
+| temp_c                  | temperature_c                        | Direct mapping expected                                |
+| humidity_pct             | humidity_pct                          | Direct mapping expected                                  |
+| time_valid               | ntp_synced                             | Possible rename, same boolean meaning                      |
+| fw_version                | firmware_version                        | Direct mapping expected                                      |
+
+## Migration Checklist: Lab Mosquitto → Zelbytes Staging
+
+- [ ] Swap `ZELBYTES_MQTT_HOST` / `ZELBYTES_MQTT_PORT` from lab broker (1883) to `careers.zelbytes.com:8883`
+- [ ] Add TLS/DTLS certificate handling for MQTTS (currently plaintext in lab)
+- [ ] Replace `lab-test-token` with the real per-device `DEVICE_TOKEN` issued from the careers portal
+- [ ] Confirm `ZELBYTES_HTTP_URL` matches the finalized `/api/v1/iot/telemetry` path once announced
+- [ ] Re-check JSON payload field names against the live API spec (see mapping table above)
+- [ ] Verify lab/production firewall allows outbound port 8883
+- [ ] Re-run round-trip serialize/deserialize test against the staging endpoint before full cutover
+
+## Authentication Model (Planned)
+
+Zelbytes plans per-device authentication using a token issued from the
+careers portal — likely a JWT or static API token. Expected usage:
+- HTTP: sent as `Authorization: Bearer <DEVICE_TOKEN>` header
+- MQTTS: sent as MQTT username/password or client certificate at CONNECT
+
+Exact mechanism (JWT vs static token) is not yet finalized.
+
+## Status
+
+Platform integration is not live for this cohort. Monitor portal
+announcements for endpoint activation and the finalized API contract before
+attempting a real connection.
