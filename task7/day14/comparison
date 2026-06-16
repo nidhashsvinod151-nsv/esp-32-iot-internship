@@ -1,0 +1,25 @@
+
+## Comparison Table
+
+| Criteria         | HTTP/HTTPS                                                        | MQTT                                                              | CoAP                                                                |
+|-------------------|--------------------------------------------------------------------|---------------------------------------------------------------------|------------------------------------------------------------------------|
+| Latency           | High per-request — full TCP + TLS handshake on every call unless connection is kept alive | Low — handshake happens once, then publish is near-instant over the open session | Very low — no handshake at all, single UDP datagram sent immediately |
+| Overhead          | ~1.5–2.5 KB on first request (TLS handshake + HTTP headers); for a ~97-byte SensorBundle payload this is mostly overhead | ~5–10 byte PUBLISH header after a one-time ~100 byte CONNECT; ~107 bytes total per message after that | ~4 byte CoAP header; ~101 bytes total per message, every time, no setup cost |
+| Offline behavior  | Request simply fails if disconnected; app must implement its own retry/queue logic | Broker can queue/retain messages (QoS 1/2) so client catches up on reconnect | No built-in queuing — sender must buffer locally and retry, or accept data loss |
+| Security          | TLS 1.2/1.3 (HTTPS) — mature, default in browsers and libraries, easy to set up | TLS optional via port 8883; often run plaintext on 1883 in lab/dev setups | DTLS available but less mature tooling; sometimes skipped on constrained nodes to save power |
+
+## Recommendation for Zelbytes Edge Nodes
+
+- **Mains-powered ESP32 (DHT22 every 60 s):** MQTT — persistent session keeps
+  per-message overhead near zero, ideal for frequent small updates.
+- **Bulk log / config upload:** HTTPS POST to `careers.zelbytes.com` —
+  infrequent, larger transactions where per-request overhead doesn't matter
+  and port 443 firewall compatibility matters most.
+- **Future battery sensor on CR2032 (Day 17, soil moisture):** CoAP — no
+  persistent connection to maintain, minimal radio-on time, built for
+  wake-send-sleep cycles that must last months on a coin cell.
+
+HTTP and MQTT are complementary rather than competing: MQTT carries the
+continuous live telemetry/command stream, while HTTPS handles bursty,
+infrequent transactions (bulk uploads, firmware/config) where broad
+firewall traversal matters more than per-message efficiency.
