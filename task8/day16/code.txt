@@ -1,0 +1,133 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "DHT.h"
+#include "secrets.h"
+#include "config.h"
+
+DHT dht(DHTPIN, DHTTYPE);
+
+void connectWiFi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
+}
+
+bool postSensorBundle(const char* jsonPayload) {
+  const int maxRetries = 3;
+  int attempt = 0;
+  int backoffMs = 1000;
+
+  while (attempt < maxRetries) {
+    HTTPClient http;
+    unsigned long startMs = millis();
+
+    http.begin(ZELBYTES_TELEMETRY_URL);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Iot-Lab-Key", ZELBYTES_API_KEY);
+
+    int httpCode = http.POST(jsonPayload);
+    unsigned long latencyMs = millis() - startMs;
+
+    Serial.print("[POST] Attempt ");
+    Serial.print(attempt + 1);
+    Serial.print(" -> HTTP ");
+    Serial.print(httpCode);
+    Serial.print(" | Latency: ");
+    Serial.print(latencyMs);
+    Serial.println(" ms");
+
+    if (httpCode == 202) {
+      Serial.println("[POST] SUCCESS: telemetry accepted");
+      String response = http.getString();
+      Serial.print("[POST] Response: ");
+      Serial.println(response);
+      http.end();
+      return true;
+    } else if (httpCode == 401 || httpCode == 403) {
+      Serial.println("[POST] FAIL 401/403: bad/missing API key. Not retrying.");
+      http.end();
+      return false;
+    } else if (httpCode == 422) {
+      Serial.println("[POST] FAIL 422: payload schema invalid. Not retrying.");
+      http.end();
+      return false;
+    } else if (httpCode >= 500 || httpCode < 0) {
+      Serial.println("[POST] Transient error. Retrying...");
+      http.end();
+      delay(backoffMs);
+      backoffMs *= 2;
+      attempt++;
+    } else {
+      Serial.print("[POST] Unexpected code: ");
+      Serial.println(httpCode);
+      http.end();
+      return false;
+    }
+  }
+  Serial.println("[POST] FAIL: exhausted retries");
+  return false;
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  dht.begin();
+  connectWiFi();
+
+  // --- Read real sensor values ---
+  float humidity = dht.readHumidity();
+  float tempC    = dht.readTemperature();
+
+  if (isnan(humidity) || isnan(tempC)) {
+    Serial.println("[SENSOR] FAIL: could not read DHT22. Aborting POST.");
+    return;
+  }
+
+  Serial.print("[SENSOR] Temp: ");
+  Serial.print(tempC);
+  Serial.print(" C, Humidity: ");
+  Serial.print(humidity);
+  Serial.println(" %");
+
+  // --- Build JSON bundle ---
+  StaticJsonDocument<256> doc;
+  doc["schema_version"] = 1;
+  doc["node_id"]         = ZELBYTES_NODE_ID;
+  doc["ts"]              = (uint32_t)(millis() / 1000); // placeholder until real NTP time wired in
+  doc["temp_c"]          = tempC;
+  doc["humidity_pct"]    = humidity;
+  doc["time_valid"]      = false; // true once NTP sync is added
+  doc["fw_version"]      = "1.0.0";
+
+  char jsonBuf[256];
+  serializeJson(doc, jsonBuf, sizeof(jsonBuf));
+  Serial.print("[JSON] Payload: ");
+  Serial.println(jsonBuf);
+
+  size_t payloadSize = measureJson(doc);
+  Serial.print("[SIZE] Payload bytes: ");
+  Serial.println(payloadSize);
+
+  // --- POST it ---
+  postSensorBundle(jsonBuf);
+
+  // --- Deliberate bad-key test ---
+  Serial.println("\n[TEST] Sending with corrupted key to verify error handling...");
+  HTTPClient http;
+  http.begin(ZELBYTES_TELEMETRY_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Iot-Lab-Key", "deliberately_wrong_key");
+  int badCode = http.POST(jsonBuf);
+  Serial.print("[TEST] Got HTTP code: ");
+  Serial.println(badCode);
+  http.end();
+}
+
+void loop() {
+  // intentionally empty for this single-shot test
+}

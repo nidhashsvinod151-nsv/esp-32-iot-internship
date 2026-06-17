@@ -1,0 +1,35 @@
+# Latency Comparison — HTTPS POST vs MQTT Publish
+
+## Measured: HTTPS POST (Day 16)
+- Endpoint: https://careers.zelbytes.com/api/iot-lab/v1/telemetry
+- Measured latency (best run): 1290 ms
+- Measured latency (earlier run, with retries due to cold-start TLS): 2273 ms
+- Payload size: 116 bytes
+
+## Not separately measured: MQTT Publish (Day 12)
+A direct timed measurement of MQTT publish latency was not recorded during
+Day 12. Based on protocol behavior, MQTT publish latency is expected to be
+significantly lower than HTTPS POST for the following reasons:
+
+- MQTT keeps a persistent TCP connection open after the initial CONNECT;
+  HTTPS POST repeats a full TCP + TLS handshake on every single request
+  unless explicitly reused.
+- The 1290-2273 ms observed for HTTPS POST is dominated almost entirely by
+  TLS handshake time, not by the actual data transfer (116 bytes is
+  negligible on the wire).
+- A typical MQTT PUBLISH on an already-connected session is expected to
+  complete in low tens of milliseconds, since there's no handshake cost
+  per message — only the actual packet send/ack.
+
+## Conclusion
+HTTPS POST overhead is dominated by per-request connection setup (TLS
+handshake), making it a poor fit for high-frequency telemetry (e.g. every
+60 seconds) but acceptable for periodic/bulk operations. MQTT's persistent
+session amortizes that cost once across many messages, making it the
+better choice for frequent telemetry — consistent with the Day 14 protocol
+comparison recommendation (MQTT for the 60s DHT22 stream, HTTPS for bulk
+upload).
+
+## Action item
+Re-run Day 12's MQTT publish sketch with a `millis()` timer wrapped around
+the publish call to get a real measured number for future comparison.
