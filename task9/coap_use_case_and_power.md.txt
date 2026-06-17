@@ -1,0 +1,34 @@
+# CoAP vs MQTT — Use Case and Power Budget
+
+## Use Case: Which Polyhouse Sensors Use CoAP vs MQTT
+
+### MQTT — Mains-Powered Nodes
+The current ESP32 DHT22 node is wall-powered, sending readings every 60
+seconds. Power is not a constraint, so MQTT's persistent TCP session is
+the efficient choice: connection overhead is paid once, then each
+telemetry publish costs only a few bytes with no handshake repeated.
+
+### CoAP — Battery-Powered Sleepy Nodes
+Future sensors such as the planned CR2030 soil moisture node (referenced
+in Day 14) will run on a coin-cell battery and must last months without
+replacement. These nodes will wake briefly on a timer, send a single NON
+message with the latest reading, and immediately return to deep sleep.
+CoAP's connectionless UDP model fits this perfectly since there is no
+ongoing session to maintain while asleep.
+
+## Power Budget Estimate: MQTT vs CoAP Wake Cycle
+
+| Criteria                          | MQTT (persistent session)         | CoAP (sleepy, ~1 hr wake cycle)         |
+|-------------------------------------|---------------------------------------|---------------------------------------------|
+| Connection model                     | Stays connected; periodic keep-alive pings | Connectionless; wakes only to send         |
+| Radio-on time per cycle               | Continuous (always listening for broker traffic) | Estimated ~100-500 ms per hour (send burst, then sleep) |
+| Estimated battery life on CR2032 (~225 mAh) | Days to weeks (continuous radio drain)     | Estimated months to roughly one year (radio off over 99% of the time) |
+
+Note: figures above are estimated for planning purposes, not measured on
+hardware, since the battery sensor node does not yet exist in this cohort.
+
+## Conclusion
+MQTT remains correct for the current always-on DHT22 node. CoAP is the
+planned protocol for any future battery-constrained sensor where radio-on
+time directly determines how long the device survives between battery
+changes.

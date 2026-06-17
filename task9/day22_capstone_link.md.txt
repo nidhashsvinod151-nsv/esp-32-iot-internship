@@ -1,0 +1,28 @@
+# Link to Day 22 Capstone — Deep Sleep Integration Plan
+
+## Connection to Today's CoAP Study
+This CoAP overview directly feeds into the Day 22 capstone, "Live
+Polyhouse Node." The planned future CR2032 soil moisture sensor will
+combine two techniques studied separately so far:
+
+1. CoAP NON messages (today, Day 17) — for power-efficient, connectionless
+   telemetry that does not require an open session.
+2. ESP32 deep sleep mode — for powering down almost entirely between
+   readings.
+
+## Planned Integration Flow
+1. ESP32 wakes from deep sleep on a timer (e.g. every 15-60 minutes).
+2. Soil moisture sensor is read.
+3. A single CoAP NON message is sent with the reading to the Zelbytes
+   CoAP resource endpoint.
+4. ESP32 immediately re-enters deep sleep without waiting for any
+   acknowledgment, since NON messages do not require one.
+5. Cycle repeats, with the device spending the overwhelming majority of
+   its time asleep to maximize CR2032 battery life.
+
+## Why Not MQTT or HTTPS Here
+Both MQTT and HTTPS rely on maintaining or re-establishing a connection,
+which costs meaningful radio-on time and battery drain on every cycle.
+CoAP's connectionless NON message avoids this entirely, making it the
+correct protocol choice for the Day 22 capstone's battery-powered sensor
+tier.
