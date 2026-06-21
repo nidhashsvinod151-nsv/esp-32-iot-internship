@@ -1,0 +1,15 @@
+# OTA Security Policy
+
+Risks:
+
+- Unsigned firmware can be modified.
+- Malicious firmware may gain device control.
+- Credentials may be stolen.
+
+Mitigations:
+
+- OTA password protection.
+- Signed firmware updates.
+- TLS protected update server.
+
+Only trusted signed firmware should be installed.

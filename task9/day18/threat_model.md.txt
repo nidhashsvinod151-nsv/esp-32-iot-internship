@@ -1,0 +1,10 @@
+# Threat Model
+
+| Threat | Impact | Mitigation |
+|----------|----------|----------|
+| Rogue WiFi Access Point | Traffic interception | TLS certificate validation |
+| Man-in-the-Middle Attack | Data modification | HTTPS/TLS |
+| API Key Theft | Unauthorized telemetry posting | Key rotation |
+| OTA Firmware Tampering | Malicious firmware installation | Signed OTA updates |
+| Device Theft | Credential exposure | Secure storage |
+| Replay Attack | Repeated old requests | Timestamp validation |

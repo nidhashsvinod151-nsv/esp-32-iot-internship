@@ -1,0 +1,18 @@
+# TLS Verification Report
+
+ESP32 connected successfully using WiFiClientSecure.
+
+Certificate validation was enabled using:
+
+secureClient.setCACert(ZELBYTES_ROOT_CA);
+
+HTTPS POST request was sent.
+
+Server returned HTTP 403 when API key validation failed.
+
+This confirms:
+
+- DNS resolution worked.
+- TLS handshake succeeded.
+- Certificate validation succeeded.
+- Server processed the request.

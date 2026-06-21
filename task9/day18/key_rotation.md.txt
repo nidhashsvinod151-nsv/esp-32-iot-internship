@@ -1,0 +1,11 @@
+# API Key Rotation Procedure
+
+1. Generate a new API key.
+2. Update secrets.h with the new key.
+3. Recompile firmware.
+4. Flash ESP32.
+5. Verify successful connection.
+6. Revoke old key.
+7. Record rotation date.
+
+Recommended interval: every 90 days.

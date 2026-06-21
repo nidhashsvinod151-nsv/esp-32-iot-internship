@@ -1,0 +1,114 @@
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "secrets.h"
+#include "config.h"
+#include "certs.h"
+
+void connectWiFi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
+}
+
+bool postSensorBundle(const char* jsonPayload) {
+  const int maxRetries = 3;
+  int attempt = 0;
+  int backoffMs = 1000;
+
+  while (attempt < maxRetries) {
+    WiFiClientSecure secureClient;
+    secureClient.setCACert(ZELBYTES_ROOT_CA);
+
+    HTTPClient http;
+    unsigned long startMs = millis();
+
+    http.begin(secureClient, ZELBYTES_TELEMETRY_URL);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Iot-Lab-Key", ZELBYTES_API_KEY);
+
+    int httpCode = http.POST(jsonPayload);
+    unsigned long latencyMs = millis() - startMs;
+
+    Serial.print("[POST] Attempt ");
+    Serial.print(attempt + 1);
+    Serial.print(" -> HTTP ");
+    Serial.print(httpCode);
+    Serial.print(" | Latency: ");
+    Serial.print(latencyMs);
+    Serial.println(" ms");
+
+    if (httpCode == 202) {
+      Serial.println("[POST] SUCCESS: telemetry accepted (TLS cert verified)");
+      http.end();
+      return true;
+    } else if (httpCode == 401 || httpCode == 403) {
+      Serial.println("[POST] FAIL 401/403: bad/missing API key. Not retrying.");
+      http.end();
+      return false;
+    } else if (httpCode == 422) {
+      Serial.println("[POST] FAIL 422: payload schema invalid. Not retrying.");
+      http.end();
+      return false;
+    } else if (httpCode >= 500 || httpCode < 0) {
+      Serial.println("[POST] Transient error (or TLS handshake issue). Retrying...");
+      http.end();
+      delay(backoffMs);
+      backoffMs *= 2;
+      attempt++;
+    } else {
+      Serial.print("[POST] Unexpected code: ");
+      Serial.println(httpCode);
+      http.end();
+      return false;
+    }
+  }
+  Serial.println("[POST] FAIL: exhausted retries");
+  return false;
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  connectWiFi();
+
+  StaticJsonDocument<256> doc;
+  doc["schema_version"] = 1;
+  doc["node_id"]         = ZELBYTES_NODE_ID;
+  doc["ts"]              = 1750000000; // replace with real NTP time from Day 4
+  doc["temp_c"]          = 28.5;
+  doc["humidity_pct"]    = 65.2;
+  doc["time_valid"]      = true;
+  doc["fw_version"]      = "1.0.0";
+
+  char jsonBuf[256];
+  serializeJson(doc, jsonBuf, sizeof(jsonBuf));
+  Serial.print("[JSON] Payload: ");
+  Serial.println(jsonBuf);
+
+  postSensorBundle(jsonBuf);
+
+  // --- Deliberate 401 test ---
+  // Still goes over a properly TLS-verified connection; only the API key is wrong.
+  Serial.println("\n[TEST] Sending with corrupted key to verify 401 handling...");
+  WiFiClientSecure testClient;
+  testClient.setCACert(ZELBYTES_ROOT_CA);
+
+  HTTPClient http;
+  http.begin(testClient, ZELBYTES_TELEMETRY_URL);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Iot-Lab-Key", "deliberately_wrong_key");
+  int badCode = http.POST(jsonBuf);
+  Serial.print("[TEST] Got HTTP code: ");
+  Serial.println(badCode);
+  http.end();
+}
+
+void loop() {
+  // Optionally repeat postSensorBundle() every N seconds here
+}
