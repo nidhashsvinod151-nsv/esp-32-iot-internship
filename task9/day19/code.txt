@@ -1,0 +1,40 @@
+// src/day19_config.cpp
+#include <Preferences.h>
+
+Preferences prefs;
+
+struct NodeConfig {
+  char wifiSsid[32];
+  char wifiPass[64];
+  char mqttHost[64];
+  char nodeId[16];
+  uint32_t sampleIntervalSec;
+  uint8_t configVersion;
+};
+
+void loadConfig(NodeConfig& cfg) {
+  prefs.begin("polyhouse", true);
+  cfg.configVersion = prefs.getUChar("cfg_ver", 0);
+  prefs.getString("wifi_ssid", cfg.wifiSsid, sizeof(cfg.wifiSsid));
+  prefs.getString("mqtt_host", cfg.mqttHost, sizeof(cfg.mqttHost));
+  prefs.getString("node_id", cfg.nodeId, sizeof(cfg.nodeId));
+  cfg.sampleIntervalSec = prefs.getUInt("interval", 60);
+  prefs.end();
+}
+
+void saveConfig(const NodeConfig& cfg) {
+  prefs.begin("polyhouse", false);
+  prefs.putUChar("cfg_ver", cfg.configVersion);
+  prefs.putString("wifi_ssid", cfg.wifiSsid);
+  prefs.putString("mqtt_host", cfg.mqttHost);
+  prefs.putString("node_id", cfg.nodeId);
+  prefs.putUInt("interval", cfg.sampleIntervalSec);
+  prefs.end();
+}
+
+void factoryReset() {
+  prefs.begin("polyhouse", false);
+  prefs.clear();
+  prefs.end();
+  ESP.restart();
+}

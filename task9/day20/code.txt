@@ -1,0 +1,16 @@
+// src/day20_soak_metrics.ino — log hourly summary to serial / SPIFFS
+struct SoakMetrics {
+  uint32_t mqttReconnects;
+  uint32_t dhtFailures;
+  uint32_t httpFailures;
+  int8_t   minRssi;
+  uint32_t uptimeSec;
+};
+
+void logHourlySummary(const SoakMetrics& m) {
+  Serial.printf(
+    "SOAK {\"uptime_h\":%.1f,\"mqtt_reconn\":%u,\"dht_fail\":%u,"
+    "\"http_fail\":%u,\"min_rssi\":%d}\n",
+    m.uptimeSec / 3600.0f, m.mqttReconnects, m.dhtFailures,
+    m.httpFailures, m.minRssi);
+}
