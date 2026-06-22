@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 21 · Task 10 — Telemetry Dashboard Wireframe</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    background: #f5f5f0;
+    color: #1a1a18;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  .page { max-width: 780px; margin: 0 auto; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab {
+    padding: 6px 16px;
+    border: 0.5px solid #bbb;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #fff;
+    color: #555;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .tab.active { background: #e6f1fb; color: #185fa5; border-color: #85b7eb; }
+
+  /* views */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* card */
+  .card {
+    background: #fff;
+    border: 0.5px solid #ddd;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 12px;
+  }
+
+  /* badges */
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 500; }
+  .badge-ok     { background: #eaf3de; color: #3b6d11; }
+  .badge-warn   { background: #faeeda; color: #854f0b; }
+  .badge-alert  { background: #fcebeb; color: #a32d2d; }
+  .badge-offline{ background: #f1efe8; color: #5f5e5a; }
+
+  /* metric cards */
+  .row { display: flex; align-items: center; gap: 12px; }
+  .metric {
+    flex: 1;
+    background: #f1efe8;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .metric .val { font-size: 22px; font-weight: 500; }
+  .metric .lbl { font-size: 12px; color: #888; margin-top: 2px; }
+
+  /* chart placeholder */
+  .chart-area {
+    background: #f1efe8;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    position: relative;
+    height: 140px;
+    overflow: hidden;
+  }
+  .chart-label { font-size: 11px; color: #888; }
+
+  /* table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    color: #888;
+    font-weight: 400;
+    padding: 6px 8px;
+    border-bottom: 0.5px solid #e0e0e0;
+  }
+  td { padding: 6px 8px; border-bottom: 0.5px solid #e0e0e0; }
+
+  /* section title */
+  .section-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: #888;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* offline banner */
+  .offline-banner {
+    background: #f1efe8;
+    border: 0.5px solid #ccc;
+    border-left: 3px solid #888;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  /* threshold */
+  .threshold-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 0.5px solid #eee;
+  }
+  .threshold-row:last-child { border: none; }
+
+  /* mobile frame */
+  .mobile-frame {
+    max-width: 375px;
+    margin: 0 auto;
+    border: 1.5px solid #ccc;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .mobile-header {
+    background: #f1efe8;
+    padding: 10px 14px;
+    font-weight: 500;
+    font-size: 13px;
+    border-bottom: 0.5px solid #ddd;
+  }
+  .mobile-card {
+    padding: 12px 14px;
+    border-bottom: 0.5px solid #eee;
+    background: #fff;
+  }
+
+  /* page header */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .page-header .sub { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+  .page-header .title { font-size: 20px; font-weight: 500; }
+
+  /* alert metric highlight */
+  .metric-alert { border: 1px solid #f09595; }
+  .val-alert { color: #a32d2d; }
+  .val-ok    { color: #3b6d11; }
+  .val-warn  { color: #854f0b; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-header">
+    <div>
+      <div class="sub">Day 21 · Task 10 · Phase 3 Production Edge</div>
+      <div class="title">Telemetry dashboard wireframe</div>
+    </div>
+    <span class="badge badge-ok" style="font-size:12px">Node 91 · Live</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="show('fleet', this)"><i class="ti ti-layout-list"></i> Fleet list</button>
+    <button class="tab" onclick="show('detail', this)"><i class="ti ti-chart-line"></i> Node detail</button>
+    <button class="tab" onclick="show('thresholds', this)"><i class="ti ti-alert-triangle"></i> Alert thresholds</button>
+    <button class="tab" onclick="show('binding', this)"><i class="ti ti-database"></i> Data binding</button>
+    <button class="tab" onclick="show('mobile', this)"><i class="ti ti-device-mobile"></i> Mobile (375px)</button>
+  </div>
+
+  <!-- FLEET LIST -->
+  <div id="fleet" class="view active">
+    <p class="section-title">Fleet list — all nodes</p>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <div style="flex:1;font-weight:500">Node 91 · Polyhouse A</div>
+        <span class="badge badge-ok">Online</span>
+      </div>
+      <div class="row">
+        <div class="metric"><div class="val">28.4°C</div><div class="lbl">Temperature</div></div>
+        <div class="metric"><div class="val">87%</div><div class="lbl">Humidity</div></div>
+        <div class="metric"><div class="val val-ok">OK</div><div class="lbl">RH status</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#888">Last seen: 2026-06-22 10:33:51 IST · FW: v1.4.2</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <div style="flex:1;font-weight:500">Node 92 · Polyhouse B</div>
+        <span class="badge badge-alert">RH Alert</span>
+      </div>
+      <div class="row">
+        <div class="metric"><div class="val">30.1°C</div><div class="lbl">Temperature</div></div>
+        <div class="metric metric-alert"><div class="val val-alert">94%</div><div class="lbl">Humidity</div></div>
+        <div class="metric"><div class="val val-alert">HIGH</div><div class="lbl">RH status</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#888">Last seen: 2026-06-22 10:33:44 IST · FW: v1.4.2</div>
+    </div>
+
+    <div class="card">
+      <div class="offline-banner">
+        <i class="ti ti-wifi-off" style="font-size:20px;color:#888"></i>
+        <div>
+          <div style="font-weight:500;font-size:13px">Node 93 · Polyhouse C — <span style="color:#888">Offline (LWT)</span></div>
+          <div style="font-size:12px;color:#888">MQTT Last Will received · Last seen: 2026-06-22 09:12:05 IST</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#888">Data frozen at last reading — Temp 27.8°C · RH 89% · FW: v1.4.1</div>
+    </div>
+  </div>
+
+  <!-- NODE DETAIL -->
+  <div id="detail" class="view">
+    <p class="section-title">Node 91 · 24-hour detail view</p>
+    <div class="card">
+      <div class="row" style="margin-bottom:14px">
+        <div class="metric"><div class="val">28.4°C</div><div class="lbl">Current temp</div></div>
+        <div class="metric"><div class="val">87%</div><div class="lbl">Current RH</div></div>
+        <div class="metric"><div class="val">10:33</div><div class="lbl">Last update</div></div>
+        <div class="metric"><div class="val val-ok" style="font-size:14px">Online</div><div class="lbl">LWT status</div></div>
+      </div>
+
+      <div class="chart-label">Temperature (°C) — last 24 h</div>
+      <div class="chart-area">
+        <svg width="100%" height="100%" viewBox="0 0 580 110" preserveAspectRatio="none">
+          <polyline points="0,80 60,75 120,65 180,60 240,70 300,55 360,62 420,58 480,65 540,60 580,62"
+            fill="none" stroke="#185FA5" stroke-width="2"/>
+          <line x1="0" y1="20" x2="580" y2="20" stroke="#E24B4A" stroke-width="1" stroke-dasharray="4"/>
+          <text x="4" y="17" font-size="9" fill="#A32D2D">Max 35°C</text>
+          <line x1="0" y1="95" x2="580" y2="95" stroke="#378ADD" stroke-width="1" stroke-dasharray="4"/>
+          <text x="4" y="108" font-size="9" fill="#185FA5">Min 15°C</text>
+        </svg>
+      </div>
+
+      <div class="chart-label" style="margin-top:14px">Humidity (%RH) — last 24 h · target 85–92%</div>
+      <div class="chart-area">
+        <svg width="100%" height="100%" viewBox="0 0 580 110" preserveAspectRatio="none">
+          <rect x="0" y="30" width="580" height="40" fill="#EAF3DE" opacity="0.7"/>
+          <text x="4" y="28" font-size="9" fill="#3B6D11">92% upper</text>
+          <text x="4" y="78" font-size="9" fill="#3B6D11">85% lower</text>
+          <polyline points="0,55 60,52 120,48 180,55 240,60 300,50 360,70 420,80 480,55 540,50 580,52"
+            fill="none" stroke="#1D9E75" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <div style="margin-top:12px;font-size:12px;color:#888">
+        <span style="margin-right:16px"><i class="ti ti-info-circle"></i> FW version: v1.4.2</span>
+        <span><i class="ti ti-shield-check"></i> TLS: ISRG Root X1 · valid to 2035</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERT THRESHOLDS -->
+  <div id="thresholds" class="view">
+    <p class="section-title">Alert thresholds · agritech rationale</p>
+    <div class="card">
+      <div class="threshold-row">
+        <div>
+          <strong>RH &lt; 85%</strong>
+          <div style="font-size:12px;color:#888;margin-top:3px">Below optimal for mushroom primordia formation (ideal 85–92%)</div>
+        </div>
+        <span class="badge badge-warn">Warning</span>
+      </div>
+      <div class="threshold-row">
+        <div>
+          <strong>RH &gt; 92%</strong>
+          <div style="font-size:12px;color:#888;margin-top:3px">Excess humidity causes contamination and Trichoderma mould risk</div>
+        </div>
+        <span class="badge badge-alert">Alert</span>
+      </div>
+      <div class="threshold-row">
+        <div>
+          <strong>Temp &gt; 35°C</strong>
+          <div style="font-size:12px;color:#888;margin-top:3px">Heat stress — Oyster mushroom optimal range 20–30°C (ICAR)</div>
+        </div>
+        <span class="badge badge-alert">Alert</span>
+      </div>
+      <div class="threshold-row">
+        <div>
+          <strong>Temp &lt; 15°C</strong>
+          <div style="font-size:12px;color:#888;margin-top:3px">Growth halts below 15°C — risk of spawn death in cold nights</div>
+        </div>
+        <span class="badge badge-warn">Warning</span>
+      </div>
+      <div class="threshold-row">
+        <div>
+          <strong>Node offline (LWT)</strong>
+          <div style="font-size:12px;color:#888;margin-top:3px">MQTT Last Will triggers if ESP32 disconnects ungracefully — loss of monitoring continuity</div>
+        </div>
+        <span class="badge badge-offline">Offline</span>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#888;margin-top:4px">Source: ICAR mushroom cultivation guidelines; Zelbytes polyhouse SOP v2</p>
+  </div>
+
+  <!-- DATA BINDING -->
+  <div id="binding" class="view">
+    <p class="section-title">Data binding — widget → API / MQTT topic</p>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead>
+          <tr>
+            <th>UI widget</th>
+            <th>Data source</th>
+            <th>MQTT topic / HTTP endpoint</th>
+            <th>Field</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Temp metric card</td><td>HTTPS POST</td><td>/api/iot-lab/v1/telemetry</td><td>temp_c</td></tr>
+          <tr><td>Humidity metric card</td><td>HTTPS POST</td><td>/api/iot-lab/v1/telemetry</td><td>humidity_pct</td></tr>
+          <tr><td>24h temp chart</td><td>HTTPS GET</td><td>/api/iot-lab/v1/telemetry/history?node=91</td><td>temp_c[]</td></tr>
+          <tr><td>24h RH chart</td><td>HTTPS GET</td><td>/api/iot-lab/v1/telemetry/history?node=91</td><td>humidity_pct[]</td></tr>
+          <tr><td>Node online badge</td><td>MQTT LWT</td><td>zelbytes/node/91/status</td><td>online / offline</td></tr>
+          <tr><td>Last-seen timestamp</td><td>HTTPS POST</td><td>/api/iot-lab/v1/telemetry</td><td>ts (ISO 8601)</td></tr>
+          <tr><td>RH alert badge</td><td>Client logic</td><td>— (derived from humidity_pct)</td><td>if &lt;85 or &gt;92</td></tr>
+          <tr><td>FW version label</td><td>HTTPS POST</td><td>/api/iot-lab/v1/telemetry</td><td>fw_version</td></tr>
+          <tr style="border:none"><td>Fleet offline card</td><td>MQTT LWT</td><td>zelbytes/node/+/status</td><td>payload: offline</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MOBILE -->
+  <div id="mobile" class="view">
+    <p class="section-title">Mobile layout · 375px width</p>
+    <div class="mobile-frame">
+      <div class="mobile-header">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span><i class="ti ti-leaf"></i> Polyhouse monitor</span>
+          <span class="badge badge-ok">3 nodes</span>
+        </div>
+      </div>
+
+      <div class="mobile-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:500">Node 91 · House A</span>
+          <span class="badge badge-ok">Online</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="metric"><div class="val" style="font-size:18px">28.4°</div><div class="lbl">Temp</div></div>
+          <div class="metric"><div class="val" style="font-size:18px">87%</div><div class="lbl">RH</div></div>
+        </div>
+        <div style="font-size:11px;color:#888;margin-top:6px">10:33 IST · tap for charts</div>
+      </div>
+
+      <div class="mobile-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:500">Node 92 · House B</span>
+          <span class="badge badge-alert">RH Alert</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="metric"><div class="val" style="font-size:18px">30.1°</div><div class="lbl">Temp</div></div>
+          <div class="metric metric-alert"><div class="val val-alert" style="font-size:18px">94%</div><div class="lbl">RH</div></div>
+        </div>
+        <div style="font-size:11px;color:#888;margin-top:6px">10:33 IST · tap for charts</div>
+      </div>
+
+      <div class="mobile-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:500">Node 93 · House C</span>
+          <span class="badge badge-offline">Offline</span>
+        </div>
+        <div style="background:#f1efe8;border-radius:8px;padding:8px;margin-top:8px;font-size:12px;color:#888">
+          <i class="ti ti-wifi-off"></i> LWT received · last seen 09:12 IST<br>
+          Data frozen at 27.8°C · 89% RH
+        </div>
+      </div>
+
+      <div class="mobile-card" style="border-bottom:none">
+        <div style="font-size:12px;color:#888;text-align:center">
+          Target RH: 85–92% · Temp: 15–35°C<br>
+          Node 91 · careers.zelbytes.com
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function show(id, btn) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>

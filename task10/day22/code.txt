@@ -1,0 +1,266 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+#include <DHT.h>
+#include <Preferences.h>
+#include "time.h"
+
+// --- Configuration Constants ---
+const char* SSID = "realme";
+const char* PASSWORD = "Ronomessi0733";
+
+// Zelbytes IoT Platform Configuration
+const char* API_BASE = "https://careers.zelbytes.com/api/iot-lab/v1";
+const char* API_KEY = "zil_wih6pz9pstvprdgghieimwrnsfvghsla"; // e.g., "zil_..."
+const char* NODE_ID = "91";
+const char* TELEMETRY_TOPIC = "zelbytes/lab/91/telemetry";
+
+// Hardware Pins
+#define DHTPIN 4
+#define DHTTYPE DHT22
+
+// NTP Server Settings
+const char* NTP_SERVER = "pool.ntp.org";
+const long  GMT_OFFSET_SEC = 0; // Set to your timezone offset if needed
+const int   DAYLIGHT_OFFSET_SEC = 0;
+
+// Default sleep interval (in seconds) if not found in NVS
+const uint32_t DEFAULT_INTERVAL_SEC = 30; 
+
+// --- Global Instances ---
+DHT dht(DHTPIN, DHTTYPE);
+Preferences preferences;
+
+// --- Function Declarations ---
+void connectToWiFi();
+void syncTime();
+String getTimestamp();
+void sendTelemetry(float temp, float humidity, String timestamp);
+void handleRemoteCommands();
+void sendACK(String command, String status, String details);
+
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+    Serial.println("\n--- ESP32 IoT Node Wakeup ---");
+
+    // 1. Initialize Hardware Sensors
+    dht.begin();
+
+    // 2. Connect to Wi-Fi
+    connectToWiFi();
+
+    // 3. Sync Time via NTP
+    syncTime();
+
+    // 4. Read DHT22 Sensor
+    float humidity = dht.readHumidity();
+    float temperature = dht.readTemperature();
+
+    // Check if readings failed and exit early if they did (to try again next wake)
+    if (isnan(humidity) || isnan(temperature)) {
+        Serial.println("Failed to read from DHT sensor!");
+        temperature = 0.0;
+        humidity = 0.0;
+    }
+
+    String currentTimestamp = getTimestamp();
+
+    // 5. Upload Telemetry via HTTPS
+    sendTelemetry(temperature, humidity, currentTimestamp);
+
+    // 6. Poll for Remote Commands & Handle them
+    handleRemoteCommands();
+
+    // 7. Read Current Interval from NVS & Go to Deep Sleep
+    preferences.begin("iot_cfg", true); // Open NVS namespace in read-only mode
+    uint32_t sleepInterval = preferences.getUInt("interval", DEFAULT_INTERVAL_SEC);
+    preferences.end();
+
+    Serial.printf("Entering deep sleep for %u seconds...\n", sleepInterval);
+    ESP.deepSleep((uint64_t)sleepInterval * 1000000);
+}
+
+void loop() {
+    // Loop is never reached due to deep sleep execution in setup
+}
+
+// --- Helper Functions ---
+
+void connectToWiFi() {
+    Serial.printf("Connecting to Wi-Fi: %s ", SSID);
+    WiFi.begin(SSID, PASSWORD);
+    
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nWi-Fi Connected!");
+        Serial.print("IP Address: ");
+        Serial.println(WiFi.localIP());
+    } else {
+        Serial.println("\nWi-Fi Connection Failed! Proceeding with offline cycle...");
+    }
+}
+
+void syncTime() {
+    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+    Serial.print("Synchronizing time via NTP");
+    struct tm timeinfo;
+    int attempts = 0;
+    while (!getLocalTime(&timeinfo) && attempts < 10) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    if (attempts < 10) {
+        Serial.println("\nTime Synchronized.");
+    } else {
+        Serial.println("\nTime Sync Failed.");
+    }
+}
+
+String getTimestamp() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        return "1970-01-01T00:00:00Z"; // Fallback
+    }
+    char timeStringBuff[30];
+    // Formats as ISO 8601 extended format
+    strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return String(timeStringBuff);
+}
+
+void sendTelemetry(float temp, float humidity, String timestamp) {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    WiFiClientSecure client;
+    client.setInsecure(); // Skip SSL certificate validation for testing flexibility
+    HTTPClient http;
+
+    String url = String(API_BASE) + "/telemetry";
+    http.begin(client, url);
+    
+    // Set Headers
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Iot-Lab-Key", API_KEY);
+
+    // Build JSON Payload
+    JsonDocument doc;
+    doc["node_id"] = NODE_ID;
+    doc["topic"] = TELEMETRY_TOPIC;
+    doc["timestamp"] = timestamp;
+    
+    JsonObject data = doc.createNestedObject("data");
+    data["temperature"] = temp;
+    data["humidity"] = humidity;
+
+    String payload;
+    serializeJson(doc, payload);
+
+    Serial.println("Sending Telemetry Payload: " + payload);
+    int httpResponseCode = http.POST(payload);
+
+    if (httpResponseCode > 0) {
+        Serial.printf("Telemetry HTTP Response code: %d\n", httpResponseCode);
+        String response = http.getString();
+        Serial.println("Response: " + response);
+    } else {
+        Serial.printf("Error on sending POST: %s\n", http.errorToString(httpResponseCode).c_str());
+    }
+    http.end();
+}
+
+void handleRemoteCommands() {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+
+    // Pulling the latest telemetry instance to review incoming desired commands/state
+    String url = String(API_BASE) + "/telemetry/latest?node_id=" + String(NODE_ID);
+    http.begin(client, url);
+    http.addHeader("X-Iot-Lab-Key", API_KEY);
+
+    int httpResponseCode = http.GET();
+    
+    if (httpResponseCode == 200) {
+        String response = http.getString();
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, response);
+
+        if (!error && doc.containsKey("command")) {
+            String command = doc["command"]["type"].as<String>();
+            JsonVariant params = doc["command"]["params"];
+
+            Serial.println("Received Remote Command: " + command);
+
+            if (command == "set_interval" && params.containsKey("interval")) {
+                uint32_t newInterval = params["interval"].as<uint32_t>();
+                
+                preferences.begin("iot_cfg", false); // Open NVS in read-write mode
+                preferences.putUInt("interval", newInterval);
+                preferences.end();
+                
+                Serial.printf("Interval updated in NVS to: %u seconds\n", newInterval);
+                sendACK(command, "SUCCESS", "Interval updated to " + String(newInterval));
+            } 
+            else if (command == "IRRIGATE") {
+                Serial.println("Executing Action: IRRIGATE");
+                // Implement your GPIO triggering logic here
+                sendACK(command, "SUCCESS", "Irrigation cycle triggered");
+            } 
+            else if (command == "STOP") {
+                Serial.println("Executing Action: STOP");
+                // Implement your safe shutdown/stop logic here
+                sendACK(command, "SUCCESS", "Operations halted");
+            } 
+            else if (command == "reboot") {
+                Serial.println("Executing Action: reboot");
+                sendACK(command, "SUCCESS", "Rebooting device...");
+                delay(1000);
+                ESP.restart();
+            }
+            else {
+                sendACK(command, "UNKNOWN", "Command handler not implemented or invalid params");
+            }
+        }
+    } else {
+        Serial.printf("Failed to fetch commands. HTTP Code: %d\n", httpResponseCode);
+    }
+    http.end();
+}
+
+void sendACK(String command, String status, String details) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+
+    // Utilizing the HTTP bridge endpoint for MQTT-style publishing
+    String url = String(API_BASE) + "/mqtt/publish";
+    http.begin(client, url);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Iot-Lab-Key", API_KEY);
+
+    JsonDocument doc;
+    doc["topic"] = "zelbytes/lab/" + String(NODE_ID) + "/ack";
+    
+    JsonObject payload = doc.createNestedObject("payload");
+    payload["command"] = command;
+    payload["status"] = status;
+    payload["details"] = details;
+    payload["timestamp"] = getTimestamp();
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    int httpResponseCode = http.POST(jsonString);
+    Serial.printf("ACK sent. HTTP Response Code: %d\n", httpResponseCode);
+    http.end();
+}
